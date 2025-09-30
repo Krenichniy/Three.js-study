@@ -2,7 +2,8 @@ import "./style.css";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import Stats from "three/addons/libs/stats.module.js";
-import { GUI } from "dat.gui";
+// import { GUI } from "dat.gui";
+import { GUI } from "lil-gui";
 
 const sceneA = new THREE.Scene();
 const sceneB = new THREE.Scene();
