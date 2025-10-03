@@ -2,28 +2,20 @@ import "./style.css";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import Stats from "three/addons/libs/stats.module.js";
-// import { GUI } from "dat.gui";
-import { GUI } from "lil-gui";
 
-const sceneA = new THREE.Scene();
-const sceneB = new THREE.Scene();
-const sceneC = new THREE.Scene();
-sceneA.background = new THREE.Color(0x123456);
-sceneB.background = new THREE.TextureLoader().load(
-    "https://sbcode.net/img/grid.png"
-);
-sceneC.background = new THREE.CubeTextureLoader()
-    .setPath("https://sbcode.net/img/")
-    .load(["px.png", "nx.png", "py.png", "ny.png", "pz.png", "nz.png"]);
-// scene.backgroundBlurriness = 0.2;
+const scene = new THREE.Scene();
+
+const gridHelper = new THREE.GridHelper();
+gridHelper.position.y = -0.5;
+scene.add(gridHelper);
 
 const camera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
     0.1,
-    1000
+    100
 );
-camera.position.z = 1.5;
+camera.position.z = 2;
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -35,57 +27,75 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-new OrbitControls(camera, renderer.domElement);
+const info = document.createElement("div");
+info.style.cssText =
+    "position:absolute;bottom:10px;left:10px;color:white;font-family:monospace;font-size: 17px;filter: drop-shadow(1px 1px 1px #000000);";
+document.body.appendChild(info);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+
+// camera.lookAt(0.5, 0.5, 0.5);
+// controls.target.set(0.5, 0.5, 0.5);
+// controls.update();
+
+controls.addEventListener("change", () => {
+    info.innerText =
+        "Polar Angle : " +
+        ((controls.getPolarAngle() / -Math.PI) * 180 + 90).toFixed(2) +
+        "°\nAzimuth Angle : " +
+        ((controls.getAzimuthalAngle() / Math.PI) * 180).toFixed(2) +
+        "°";
+});
+// controls.addEventListener("start", () => console.log("Controls Start Event"));
+// controls.addEventListener("end", () => console.log("Controls End Event"));
+// controls.autoRotate = true;
+// controls.autoRotateSpeed = 10;
+// controls.enableDamping = true;
+// controls.dampingFactor = 0.01;
+controls.listenToKeyEvents(window);
+// controls.keys = {
+//     LEFT: "KeyA", // default 'ArrowLeft'
+//     UP: "KeyW", // default 'ArrowUp'
+//     RIGHT: "KeyD", // default 'ArrowRight'
+//     BOTTOM: "KeyS", // default 'ArrowDown'
+// };
+// controls.mouseButtons = {
+//     LEFT: THREE.MOUSE.ROTATE,
+//     MIDDLE: THREE.MOUSE.DOLLY,
+//     RIGHT: THREE.MOUSE.PAN,
+// };
+// controls.touches = {
+//     ONE: THREE.TOUCH.ROTATE,
+//     TWO: THREE.TOUCH.DOLLY_PAN
+// }
+// controls.screenSpacePanning = true
+// controls.minAzimuthAngle = -Math.PI / 4;
+// controls.maxAzimuthAngle = Math.PI / 4;
+// controls.minPolarAngle = Math.PI / 4;
+// controls.maxPolarAngle = Math.PI - Math.PI / 4;
+// controls.maxDistance = 4;
+// controls.minDistance = 1.5;
+// controls.enabled = false;
+// controls.enablePan = false;
+// controls.enableRotate = false
+// controls.enableZoom = false
 
 const geometry = new THREE.BoxGeometry();
 const material = new THREE.MeshNormalMaterial({ wireframe: true });
 
 const cube = new THREE.Mesh(geometry, material);
-sceneA.add(cube);
+scene.add(cube);
 
 const stats = new Stats();
-// stats.showPanel(1);
 document.body.appendChild(stats.dom);
-
-const gui = new GUI();
-
-const cubeFolder = gui.addFolder("Cube");
-cubeFolder.add(cube.rotation, "x", 0, Math.PI * 2);
-cubeFolder.add(cube.rotation, "y", 0, Math.PI * 2);
-cubeFolder.add(cube.rotation, "z", 0, Math.PI * 2);
-cubeFolder.open(); // open folder by default
-
-let actualScene = sceneA;
-const setScene = {
-    sceneA: function () {
-        actualScene = sceneA;
-    },
-    sceneB: function () {
-        actualScene = sceneB;
-    },
-    sceneC: function () {
-        actualScene = sceneC;
-    },
-};
-gui.add(setScene, "sceneA").name("Scene A");
-
-gui.add(setScene, "sceneB").name("Scene B");
-
-gui.add(setScene, "sceneC").name("Scene C");
-
-const cameraFolder = gui.addFolder("Camera");
-cameraFolder.add(camera.position, "z", 0, 20);
-cameraFolder.open();
 
 function animate() {
     requestAnimationFrame(animate);
 
-    // stats.begin();
-    // cube.rotation.x += 0.01;
-    // cube.rotation.y += 0.01;
-    // stats.end();
+    controls.update();
 
-    renderer.render(actualScene, camera);
+    renderer.render(scene, camera);
+
     stats.update();
 }
 
