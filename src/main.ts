@@ -1,31 +1,130 @@
 import "./style.css";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import Stats from "three/addons/libs/stats.module.js";
-// import { GUI } from "dat.gui";
-import { GUI } from "lil-gui";
 
-const sceneA = new THREE.Scene();
-const sceneB = new THREE.Scene();
-const sceneC = new THREE.Scene();
-sceneA.background = new THREE.Color(0x123456);
-sceneB.background = new THREE.TextureLoader().load(
-    "https://sbcode.net/img/grid.png"
-);
-sceneC.background = new THREE.CubeTextureLoader()
-    .setPath("https://sbcode.net/img/")
-    .load(["px.png", "nx.png", "py.png", "ny.png", "pz.png", "nz.png"]);
-// scene.backgroundBlurriness = 0.2;
+class CharacterController {
+    keyMap: { [key: string]: boolean } = {};
+    wait = false;
+    animationActions: { [key: string]: THREE.AnimationAction };
+    activeAction = "";
+    speed = 0;
+
+    constructor(animationActions: { [key: string]: THREE.AnimationAction }) {
+        this.animationActions = animationActions;
+        document.addEventListener("keydown", this.onDocumentKey);
+        document.addEventListener("keyup", this.onDocumentKey);
+    }
+
+    onDocumentKey = (e: KeyboardEvent) => {
+        this.keyMap[e.code] = e.type === "keydown";
+    };
+
+    dispose() {
+        document.removeEventListener("keydown", this.onDocumentKey);
+        document.removeEventListener("keyup", this.onDocumentKey);
+    }
+
+    setAction(action: string) {
+        if (this.activeAction != action) {
+            this.animationActions[this.activeAction].fadeOut(0.25);
+            this.animationActions[action].reset().fadeIn(0.25).play();
+            this.activeAction = action;
+
+            switch (action) {
+                case "walk":
+                    this.speed = 1;
+                    break;
+                case "run":
+                case "jump":
+                    this.speed = 4;
+                    break;
+                case "idle":
+                    this.speed = 2;
+                    break;
+                case "stand":
+                    this.speed = 0;
+                    break;
+            }
+        }
+    }
+
+    update() {
+        if (!this.wait) {
+            let actionAssigned = false;
+
+            if (this.keyMap["Space"]) {
+                this.setAction("jump");
+                actionAssigned = true;
+                this.wait = true; // blocks further actions until jump is finished
+                setTimeout(() => (this.wait = false), 1000);
+            }
+
+            if (
+                !actionAssigned &&
+                this.keyMap["KeyW"] &&
+                this.keyMap["ShiftLeft"]
+            ) {
+                this.setAction("run");
+                actionAssigned = true;
+            }
+
+            if (!actionAssigned && this.keyMap["KeyW"]) {
+                this.setAction("walk");
+                actionAssigned = true;
+            }
+
+            if (!actionAssigned && this.keyMap["KeyF"]) {
+                this.setAction("idle");
+                actionAssigned = true;
+            }
+
+            !actionAssigned && this.setAction("stand");
+        }
+    }
+}
+
+class Grid {
+    gridHelper = new THREE.GridHelper(100, 100);
+    speed = 0;
+
+    constructor(scene: THREE.Scene) {
+        scene.add(this.gridHelper);
+    }
+
+    lerp(from: number, to: number, speed: number) {
+        const amount = (1 - speed) * from + speed * to;
+        return Math.abs(from - to) < 0.001 ? to : amount;
+    }
+
+    update(delta: number, toSpeed: number) {
+        this.speed = this.lerp(this.speed, toSpeed, delta * 10);
+        this.gridHelper.position.z -= this.speed * delta;
+        this.gridHelper.position.z = this.gridHelper.position.z % 10;
+    }
+}
+
+const scene = new THREE.Scene();
+
+new RGBELoader().load("img/venice_sunset_1k.hdr", (texture) => {
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = texture;
+    scene.background = texture;
+    scene.backgroundBlurriness = 1;
+});
 
 const camera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
     0.1,
-    1000
+    100
 );
-camera.position.z = 1.5;
+camera.position.set(0.1, 1, 1);
 
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
@@ -35,57 +134,76 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-new OrbitControls(camera, renderer.domElement);
-
-const geometry = new THREE.BoxGeometry();
-const material = new THREE.MeshNormalMaterial({ wireframe: true });
-
-const cube = new THREE.Mesh(geometry, material);
-sceneA.add(cube);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 0.75, 0);
 
 const stats = new Stats();
-// stats.showPanel(1);
 document.body.appendChild(stats.dom);
 
-const gui = new GUI();
+let mixer: THREE.AnimationMixer;
+let animationActions: { [key: string]: THREE.AnimationAction } = {};
 
-const cubeFolder = gui.addFolder("Cube");
-cubeFolder.add(cube.rotation, "x", 0, Math.PI * 2);
-cubeFolder.add(cube.rotation, "y", 0, Math.PI * 2);
-cubeFolder.add(cube.rotation, "z", 0, Math.PI * 2);
-cubeFolder.open(); // open folder by default
+const characterController = new CharacterController(animationActions);
+const grid = new Grid(scene);
 
-let actualScene = sceneA;
-const setScene = {
-    sceneA: function () {
-        actualScene = sceneA;
-    },
-    sceneB: function () {
-        actualScene = sceneB;
-    },
-    sceneC: function () {
-        actualScene = sceneC;
-    },
-};
-gui.add(setScene, "sceneA").name("Scene A");
+const dracoLoader = new DRACOLoader();
+// dracoLoader.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/"); // loading from a CDN
+dracoLoader.setDecoderPath("jsm/draco/"); // loading from own webserver
 
-gui.add(setScene, "sceneB").name("Scene B");
+const glTFLoader = new GLTFLoader();
+glTFLoader.setDRACOLoader(dracoLoader);
 
-gui.add(setScene, "sceneC").name("Scene C");
+// glTFLoader.load("models/exo$@walk_compressed.glb", (gltf) => {
+//     mixer = new THREE.AnimationMixer(gltf.scene);
 
-const cameraFolder = gui.addFolder("Camera");
-cameraFolder.add(camera.position, "z", 0, 20);
-cameraFolder.open();
+//     mixer.clipAction(gltf.animations[0]).play();
+
+//     scene.add(gltf.scene);
+// });
+
+async function loadEve() {
+    const [eve, idle, run, jump, stand] = await Promise.all([
+        glTFLoader.loadAsync("models/exo$@walk_compressed.glb"),
+        glTFLoader.loadAsync("models/exo@capoera.glb"),
+        glTFLoader.loadAsync("models/exo@run.glb"),
+        glTFLoader.loadAsync("models/exo@jump.glb"),
+        glTFLoader.loadAsync("models/exo@stands.glb"),
+    ]);
+
+    mixer = new THREE.AnimationMixer(eve.scene);
+
+    animationActions["idle"] = mixer.clipAction(idle.animations[0]);
+    animationActions["walk"] = mixer.clipAction(eve.animations[0]);
+    animationActions["run"] = mixer.clipAction(run.animations[0]);
+    animationActions["jump"] = mixer.clipAction(jump.animations[0]);
+    animationActions["stand"] = mixer.clipAction(stand.animations[0]);
+
+    animationActions["stand"].play();
+    characterController.activeAction = "stand";
+
+    scene.add(eve.scene);
+}
+await loadEve();
+
+const clock = new THREE.Clock();
+let delta = 0;
 
 function animate() {
     requestAnimationFrame(animate);
 
-    // stats.begin();
-    // cube.rotation.x += 0.01;
-    // cube.rotation.y += 0.01;
-    // stats.end();
+    delta = clock.getDelta();
 
-    renderer.render(actualScene, camera);
+    controls.update();
+
+    characterController.update();
+
+    mixer && mixer.update(delta);
+
+    grid.update(delta, characterController.speed);
+
+    renderer.render(scene, camera);
+
     stats.update();
 }
 
