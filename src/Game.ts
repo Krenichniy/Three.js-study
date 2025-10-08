@@ -109,7 +109,7 @@ export default class Game {
             this.camera,
             this.renderer,
             this.world,
-            [-5.5, 4.5, 4.5],
+            [0, 1, 0],
             this.ui
         );
         await this.player.init();
