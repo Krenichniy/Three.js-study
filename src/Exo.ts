@@ -23,10 +23,9 @@ export default class Eve extends Group {
     }
 
     async init(animationActions: { [key: string]: AnimationAction }) {
-        const [eve, idle, run, jump, pose] = await Promise.all([
+        const [eve, idle, jump, pose] = await Promise.all([
             this.glTFLoader.loadAsync("models/exo$@walk_compressed.glb"),
             this.glTFLoader.loadAsync("models/exo@capoera.glb"),
-            this.glTFLoader.loadAsync("models/exo@run.glb"),
             this.glTFLoader.loadAsync("models/exo@jumping.glb"),
             this.glTFLoader.loadAsync("models/exo@stands.glb"),
         ]);
@@ -39,22 +38,17 @@ export default class Eve extends Group {
 
         this.mixer = new AnimationMixer(eve.scene);
         animationActions["idle"] = this.mixer.clipAction(idle.animations[0]);
-        // animationActions["walk"] = this.mixer.clipAction(eve.animations[0]);
         animationActions["walk"] = this.mixer.clipAction(
             AnimationUtils.subclip(eve.animations[0], "walk", 0, 42)
-        );
-        animationActions["run"] = this.mixer.clipAction(run.animations[0]);
-        animationActions["run"] = this.mixer.clipAction(
-            AnimationUtils.subclip(run.animations[0], "run", 0, 17)
         );
         // jump.animations[0].tracks = jump.animations[0].tracks.filter(function (e) {
         //   return !e.name.endsWith('.position')
         // })
-        // console.log(jump.animations[0].tracks)
+        //console.log(jump.animations[0].tracks)
         animationActions["jump"] = this.mixer.clipAction(jump.animations[0]);
         animationActions["pose"] = this.mixer.clipAction(pose.animations[0]);
 
-        animationActions["pose"].play();
+        animationActions["idle"].play();
 
         this.add(eve.scene);
     }

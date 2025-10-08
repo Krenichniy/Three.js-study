@@ -1,7 +1,6 @@
 import {
     DirectionalLight,
     EquirectangularReflectionMapping,
-    GridHelper,
     Scene,
     TextureLoader,
 } from "three";
@@ -14,8 +13,6 @@ export default class Environment {
 
     constructor(scene: Scene) {
         this.scene = scene;
-
-        this.scene.add(new GridHelper(50, 50));
 
         this.light = new DirectionalLight(0xffffff, Math.PI);
         this.light.position.set(65.7, 19.2, 50.2);
